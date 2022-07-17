@@ -88,7 +88,7 @@ func getCachedResponse(iCache CacheInterface, req *http.Request, webStaticFile b
 	}
 
 	if !webStaticFile {
-		return resp, cachedResp, err
+		return resp, cachedResp, nil
 	}
 
 	validationResult, err := validateTheCacheControl(req, resp)
@@ -104,7 +104,7 @@ func getCachedResponse(iCache CacheInterface, req *http.Request, webStaticFile b
 		return resp, cachedResp, fmt.Errorf("cached-item already expired")
 	}
 
-	return resp, cachedResp, err
+	return resp, cachedResp, nil
 }
 
 func getCacheKey(req *http.Request) (key string) {
