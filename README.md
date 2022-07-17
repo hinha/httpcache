@@ -1,5 +1,5 @@
 # Inject-able HTTP cache in Golang
- Just inject the cache to HTTP client, this will integrate with cache (Redis)
+ Just inject the cache to the HTTP client, this will integrate with cache (Redis)
 
 ## Quickstart
 
@@ -32,6 +32,9 @@ var (
 
 func main() {
 	client := &http.Client{}
+	// when webStatic is true can only be used static web ex: google.com
+	// cause need cache-control
+	webStatic := true
 	_ = cache.NewRedisCache(client, &httpcache.RedisCacheOptions{
 		Addr: "localhost:6379",
 	}, time.Second*time.Duration(60))
