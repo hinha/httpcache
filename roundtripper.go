@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"strings"
 	"time"
 
@@ -57,15 +58,9 @@ func (c *CacheHandler) RoundTrip(request *http.Request) (*http.Response, error) 
 }
 
 func storeRespToCache(Icache CacheInterface, request *http.Request, response *http.Response) error {
-	var uri string
-	if request.RequestURI != "" {
-		uri = request.RequestURI
-	} else {
-		uri = request.URL.String()
-	}
 	cachedResp := CachedResponse{
 		RequestMethod: request.Method,
-		RequestURI:    uri,
+		RequestURI:    getUrl(request),
 		CachedTime:    time.Now(),
 	}
 
@@ -107,13 +102,7 @@ func getCachedResponse(iCache CacheInterface, req *http.Request) (*http.Response
 }
 
 func getCacheKey(req *http.Request) (key string) {
-	var uri string
-	if req.RequestURI != "" {
-		uri = req.RequestURI
-	} else {
-		uri = req.URL.String()
-	}
-	key = fmt.Sprintf("%s %s", req.Method, uri)
+	key = fmt.Sprintf("%s %s", req.Method, getUrl(req))
 	if req.Header.Get(HeaderAuthorization) != "" {
 		// need token bearer
 		key = fmt.Sprintf("%s %s", key, strings.TrimSpace(req.Header.Get(HeaderAuthorization)))
@@ -176,4 +165,18 @@ func buildTheCachedResponseHeader(resp *http.Response, cachedResp CachedResponse
 	resp.Header.Add("Expires", cachedResp.CachedTime.String())
 	resp.Header.Add(XFromHache, "true")
 	resp.Header.Add(XHacheOrigin, origin)
+}
+
+func getUrl(req *http.Request) string {
+	var uri string
+	if req.RequestURI != "" {
+		uri = req.RequestURI
+	} else {
+		uri = req.URL.String()
+	}
+	parse, err := url.QueryUnescape(uri)
+	if err == nil {
+		uri = parse
+	}
+	return uri
 }
