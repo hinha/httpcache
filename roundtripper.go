@@ -24,22 +24,24 @@ var (
 type CacheHandler struct {
 	defaultRoundTripper http.RoundTripper
 	iCache              CacheInterface
+	webStaticFile       bool
 }
 
 // NewCacheHandlerRoundtrip will create an implementations of cache http roundtripper
-func NewCacheHandlerRoundtrip(roundTripper http.RoundTripper, ICache CacheInterface) *CacheHandler {
+func NewCacheHandlerRoundtrip(roundTripper http.RoundTripper, ICache CacheInterface, webStaticFile bool) *CacheHandler {
 	if ICache == nil {
 		panic("cache storage is not well set")
 	}
 	return &CacheHandler{
 		defaultRoundTripper: roundTripper,
 		iCache:              ICache,
+		webStaticFile:       webStaticFile,
 	}
 }
 
 // RoundTrip the implementation of http.RoundTripper
 func (c *CacheHandler) RoundTrip(request *http.Request) (*http.Response, error) {
-	cachedResp, cachedItem, cachedErr := getCachedResponse(c.iCache, request)
+	cachedResp, cachedItem, cachedErr := getCachedResponse(c.iCache, request, c.webStaticFile)
 	if cachedResp != nil && cachedErr == nil {
 		buildTheCachedResponseHeader(cachedResp, cachedItem, "CACHE")
 		return cachedResp, cachedErr
@@ -73,7 +75,7 @@ func storeRespToCache(Icache CacheInterface, request *http.Request, response *ht
 	return Icache.Set(getCacheKey(request), cachedResp)
 }
 
-func getCachedResponse(iCache CacheInterface, req *http.Request) (*http.Response, CachedResponse, error) {
+func getCachedResponse(iCache CacheInterface, req *http.Request, webStaticFile bool) (*http.Response, CachedResponse, error) {
 	cachedResp, err := iCache.Get(getCacheKey(req))
 	if err != nil {
 		return nil, CachedResponse{}, err
@@ -83,6 +85,10 @@ func getCachedResponse(iCache CacheInterface, req *http.Request) (*http.Response
 	resp, err := http.ReadResponse(bufio.NewReader(cachedResponse), req)
 	if err != nil {
 		return nil, cachedResp, err
+	}
+
+	if !webStaticFile {
+		return resp, cachedResp, err
 	}
 
 	validationResult, err := validateTheCacheControl(req, resp)
@@ -95,7 +101,7 @@ func getCachedResponse(iCache CacheInterface, req *http.Request) (*http.Response
 	}
 
 	if time.Now().After(validationResult.OutExpirationTime) {
-		return nil, cachedResp, fmt.Errorf("cached-item already expired")
+		return resp, cachedResp, fmt.Errorf("cached-item already expired")
 	}
 
 	return resp, cachedResp, err
@@ -116,16 +122,15 @@ func validateTheCacheControl(req *http.Request, resp *http.Response) (helper.Obj
 		return helper.ObjectResults{}, err
 	}
 
-	resDir, err := helper.ParseResponseCacheControl(req.Header.Get(HeaderCacheControl))
+	resDir, err := helper.ParseResponseCacheControl(resp.Header.Get(HeaderCacheControl))
 	if err != nil {
 		return helper.ObjectResults{}, err
 	}
 
 	expiry := resp.Header.Get("Expires")
 	expiresHeader, err := http.ParseTime(expiry)
-	if err != nil && expiry != "" &&
-		// https://stackoverflow.com/questions/11357430/http-expires-header-values-0-and-1
-		expiry != "-1" && expiry != "0" {
+	// https://stackoverflow.com/questions/11357430/http-expires-header-values-0-and-1
+	if err != nil && expiry != "" && expiry != "-1" && expiry != "0" {
 		return helper.ObjectResults{}, err
 	}
 
