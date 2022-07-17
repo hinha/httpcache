@@ -1,5 +1,5 @@
 # Inject-able HTTP cache in Golang
- Just inject the cache to the HTTP client, this will integrate with cache (Redis)
+ Just inject the cache to HTTP client, this will integrate with cache (Redis)
 
 ## Quickstart
 
